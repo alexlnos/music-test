@@ -1,0 +1,21 @@
+linters-settings:
+  gofmt:
+    simplify: true
+
+linters:
+  enable:
+    - gofmt
+    - goimports
+    - golint
+    - govet
+    - unused
+    - deadcode
+  disable:
+    - errcheck
+
+issues:
+  exclude-rules:
+    - linters:
+        - golint
+      text: "exported \\w+ should have comment or be unexported"
+  exclude-use-default: false
