@@ -7,6 +7,7 @@ import (
 
 type Config struct {
 	CheckInterval time.Duration
+	NumWorkers    int
 }
 
 func LoadConfig() *Config {
@@ -22,5 +23,6 @@ func LoadConfig() *Config {
 
 	return &Config{
 		CheckInterval: time.Duration(viper.GetInt("checkInterval")) * time.Second,
+		NumWorkers:    viper.GetInt("numWorkers"),
 	}
 }

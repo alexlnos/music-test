@@ -1,1 +1,2 @@
 checkInterval: 10
+numWorkers: 2

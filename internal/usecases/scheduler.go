@@ -1,33 +1,40 @@
 package usecases
 
 import (
-	"os"
 	"time"
 )
 
 type Scheduler struct {
 	siteChecker *SiteChecker
 	ticker      *time.Ticker
-	quit        chan os.Signal
+	urls        []string
+	quit        chan struct{} // Добавляем канал для остановки
 }
 
-func NewScheduler(checker *SiteChecker, ticker *time.Ticker, quit chan os.Signal) *Scheduler {
+func NewScheduler(checker *SiteChecker, ticker *time.Ticker, urls []string) *Scheduler {
 	return &Scheduler{
 		siteChecker: checker,
 		ticker:      ticker,
-		quit:        quit,
+		urls:        urls,
+		quit:        make(chan struct{}), // Инициализируем канал
 	}
 }
 
 func (s *Scheduler) Start() {
-	go func() {
+	func() {
 		for {
 			select {
-			case <-s.ticker.C:
-				s.siteChecker.CheckSites()
-			case <-s.quit:
+			case <-s.ticker.C: // Слушаем тикер
+				for _, url := range s.urls {
+					s.siteChecker.CheckSite(url) // Запускаем проверку в отдельной горутине
+				}
+			case <-s.quit: // Слушаем сигнал остановки
 				return
 			}
 		}
 	}()
+}
+
+func (s *Scheduler) Stop() {
+	close(s.quit) // Закрываем канал для остановки работы Scheduler
 }

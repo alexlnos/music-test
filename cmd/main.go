@@ -4,38 +4,55 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
+	"sync"
 	"test-music/internal/adapters"
 	"test-music/internal/config"
 	"test-music/internal/usecases"
 	"time"
 )
 
+func distributeSites(sites []string, numWorkers int) [][]string {
+	var divided [][]string
+	chunkSize := (len(sites) + numWorkers - 1) / numWorkers // Округление вверх
+
+	for i := 0; i < len(sites); i += chunkSize {
+		end := i + chunkSize
+		if end > len(sites) {
+			end = len(sites)
+		}
+		divided = append(divided, sites[i:end])
+	}
+	return divided
+}
+
 func main() {
 	cfg := config.LoadConfig()
 
-	interval := cfg.CheckInterval
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+	client := adapters.NewHTTPClient()
+	checker := usecases.NewSiteChecker(client)
 
-	quit := make(chan os.Signal)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Println("Enter the URLs, each on a new line, then press Ctrl-D:")
-	urls := []string{}
+	scanner := bufio.NewScanner(os.Stdin)
+	var urls []string
 	for scanner.Scan() {
 		urls = append(urls, scanner.Text())
 	}
-	println("Start check sites...")
 
-	client := adapters.NewHTTPClient()
-	siteChecker := usecases.NewSiteChecker(client, urls)
-	scheduler := usecases.NewScheduler(siteChecker, ticker, quit)
+	urlGroups := distributeSites(urls, cfg.NumWorkers)
+	var wg sync.WaitGroup
 
-	scheduler.Start()
+	// Запускаем Scheduler для каждой группы URL
+	for _, group := range urlGroups {
+		wg.Add(1)
+		go func(group []string) {
+			ticker := time.NewTicker(cfg.CheckInterval)
+			defer ticker.Stop()
+			scheduler := usecases.NewScheduler(checker, ticker, group)
+			scheduler.Start()
+			wg.Done()
+		}(group)
+	}
 
-	<-quit
-	fmt.Println("Shutting down the application...")
+	println("11111")
+	wg.Wait() // Ждем завершения всех Scheduler
 }
